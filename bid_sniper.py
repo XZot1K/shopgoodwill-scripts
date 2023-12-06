@@ -9,7 +9,6 @@ import queue
 from json.decoder import JSONDecodeError
 from logging.handlers import QueueHandler, QueueListener
 from typing import Any, Callable, Dict, Iterable, Optional
-from zoneinfo import ZoneInfo
 
 import parsedatetime
 from requests.exceptions import HTTPError
@@ -17,9 +16,14 @@ from requests.models import Response
 
 import shopgoodwill
 
+import pytz
+
+utc_timezone = pytz.timezone("Etc/UTC")
+pacific_timezone = pytz.timezone("US/Pacific")
+
 
 def get_timedelta_to_time(
-    end_time: datetime.datetime, truncate_microseconds: Optional[bool] = True
+        end_time: datetime.datetime, truncate_microseconds: Optional[bool] = True
 ) -> datetime.timedelta:
     """
     Given a datetime object (hopefully in the future),
@@ -68,8 +72,8 @@ class BidSniper:
             # stop tracking it and alert on the elapsed time
             if self.outage_start_time is not None:
                 elapsed_outage_time = (
-                    datetime.datetime.now(datetime.timezone.utc)
-                    - self.outage_start_time
+                        datetime.datetime.now(datetime.timezone.utc)
+                        - self.outage_start_time
                 )
                 self.outage_start_time = None
 
@@ -139,8 +143,8 @@ class BidSniper:
         cal = parsedatetime.Calendar()
         for time_delta_str in config["bid_sniper"].get("alert_time_deltas", list()):
             time_delta = (
-                cal.parseDT(time_delta_str, sourceTime=datetime.datetime.min)[0]
-                - datetime.datetime.min
+                    cal.parseDT(time_delta_str, sourceTime=datetime.datetime.min)[0]
+                    - datetime.datetime.min
             )
             if time_delta != datetime.timedelta(0):
                 self.alert_time_deltas.append(time_delta)
@@ -152,17 +156,15 @@ class BidSniper:
             "bid_snipe_time_delta", "30 seconds"
         )
         self.bid_time_delta = (
-            cal.parseDT(bid_time_delta_str, sourceTime=datetime.datetime.min)[0]
-            - datetime.datetime.min
+                cal.parseDT(bid_time_delta_str, sourceTime=datetime.datetime.min)[0]
+                - datetime.datetime.min
         )
         if self.bid_time_delta == datetime.timedelta(0):
             self.logger.warning("Invalid time delta string '{time_delta_str}'")
 
         # TODO I hate this
         self.favorites_cache = {
-            "last_updated": datetime.datetime.fromisoformat("1970-01-01").astimezone(
-                ZoneInfo("Etc/UTC")
-            ),
+            "last_updated": datetime.datetime.fromisoformat("1970-01-01").astimezone(utc_timezone),
             "favorites": list(),
         }
 
@@ -183,8 +185,8 @@ class BidSniper:
         """
 
         if (
-            datetime.datetime.now(datetime.timezone.utc)
-            - self.favorites_cache["last_updated"]
+                datetime.datetime.now(datetime.timezone.utc)
+                - self.favorites_cache["last_updated"]
         ).seconds > max_cache_time:
             try:
                 self.favorites_cache = {
@@ -215,10 +217,10 @@ class BidSniper:
             )
 
     async def schedule_task(
-        self,
-        coroutine,
-        execution_datetime: datetime.datetime,
-        callbacks: Optional[Iterable[Callable[[asyncio.Task], Any]]] = None,
+            self,
+            coroutine,
+            execution_datetime: datetime.datetime,
+            callbacks: Optional[Iterable[Callable[[asyncio.Task], Any]]] = None,
     ) -> None:
         """
         Simple function to delay a coroutine's execution
@@ -405,14 +407,14 @@ class BidSniper:
                 # TODO validate that the site only uses a single timezone!
                 end_time = (
                     datetime.datetime.fromisoformat(favorite_info["endTime"])
-                    .replace(tzinfo=ZoneInfo("US/Pacific"))
-                    .astimezone(ZoneInfo("Etc/UTC"))
+                    .replace(tzinfo=pacific_timezone)
+                    .astimezone(utc_timezone)
                 )
 
                 # only schedule tasks for the item if the "nearest" task is within refresh_seconds * 3 seconds
                 # TODO flip this to "if less than, schedule thing"
                 if (end_time - min_scheduling_timedelta) <= now + datetime.timedelta(
-                    seconds=refresh_seconds * 3
+                        seconds=refresh_seconds * 3
                 ):
                     # schedule reminders for whenever the user configured
                     for alert_time_delta in self.alert_time_deltas:
@@ -467,7 +469,7 @@ def parse_args():
         "--dry-run",
         action="store_true",
         help="If set, do not perform any actions "
-        "that modify state on ShopGoodwill (eg. placing bids)",
+             "that modify state on ShopGoodwill (eg. placing bids)",
     )
     args = parser.parse_args()
 
